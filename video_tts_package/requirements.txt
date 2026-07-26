@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+yt-dlp
+edge-tts
+pydub
+requests
+python-dotenv
+streamlit
