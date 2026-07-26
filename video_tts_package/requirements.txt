@@ -6,3 +6,4 @@ pydub
 requests
 python-dotenv
 streamlit
+pyaudioop
