@@ -3,6 +3,7 @@ uvicorn[standard]
 yt-dlp
 edge-tts
 pydub
+pyaudioop
 requests
 python-dotenv
 streamlit
