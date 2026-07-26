@@ -1,13 +1,21 @@
 import streamlit as st
-import requests
 import time
 import os
+import uuid
+import tempfile
+import shutil
+import traceback
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# Import refactored modules directly
+from transcript import fetch_transcript_segments
+from tts import synthesize_and_align, ensure_audio_length
 
 st.set_page_config(page_title="YouTube TTS", page_icon="🎙️")
 
 st.title("YouTube Transcript → Hindi TTS")
-
-API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
 
 video_url = st.text_input("YouTube Video URL", placeholder="https://www.youtube.com/watch?v=dQw4w9WgXcQ")
 
@@ -15,42 +23,43 @@ if st.button("Process Video"):
     if not video_url:
         st.error("Please enter a valid YouTube URL.")
     else:
-        # submit job
+        job_id = uuid.uuid4().hex[:16]
+        # JOBS dict to pass to synthesize_and_align to track progress message
+        job_state = {job_id: {"message": "starting"}}
+
+        tmpdir = None
+
         try:
-            resp = requests.post(f"{API_BASE_URL}/process/", data={"video_url": video_url})
-            resp.raise_for_status()
-            data = resp.json()
-            job_id = data.get("job_id")
+            with st.status("Processing video...") as status:
+                st.write("Fetching transcript...")
+                segments = fetch_transcript_segments(video_url)
 
-            st.success(f"Job started! ID: {job_id}")
+                st.write(f"Fetched {len(segments)} segments. Synthesizing TTS...")
+                tmpdir = tempfile.mkdtemp(prefix="vt_")
 
-            status_placeholder = st.empty()
+                # We can't easily hook into the exact message updates inside the loop in tts.py using st.status dynamically without threading,
+                # but we can just run it synchronously since this is Streamlit.
+                final_mp3 = synthesize_and_align(segments, tmpdir, job_id, job_state)
 
-            while True:
-                status_resp = requests.get(f"{API_BASE_URL}/status/{job_id}")
-                if status_resp.status_code == 200:
-                    status_data = status_resp.json()
-                    status = status_data.get("status")
-                    message = status_data.get("message")
+                st.write("Ensuring audio length...")
+                last_seg = segments[-1]
+                expected = last_seg['start'] + last_seg['duration']
+                actual_sec = ensure_audio_length(final_mp3, expected)
 
-                    status_placeholder.info(f"Status: {status} | Message: {message}")
+                status.update(label="Audio processing complete!", state="complete", expanded=True)
 
-                    if status == "done":
-                        st.success("Audio processing complete!")
-                        st.markdown(f"[Download MP3 here]({API_BASE_URL}/output/{job_id})")
+            st.success(f"Processing complete! Audio length: {actual_sec:.2f}s")
 
-                        # also provide a direct audio player
-                        output_resp = requests.get(f"{API_BASE_URL}/output/{job_id}")
-                        if output_resp.status_code == 200:
-                            st.audio(output_resp.content, format="audio/mpeg")
-                        break
-                    elif status == "error":
-                        st.error(f"Error: {status_data.get('error')}")
-                        break
-                else:
-                    status_placeholder.warning("Waiting for status...")
+            # Read audio file before cleanup
+            with open(final_mp3, "rb") as f:
+                audio_bytes = f.read()
 
-                time.sleep(2)
+            st.audio(audio_bytes, format="audio/mpeg")
+            st.download_button(label="Download MP3", data=audio_bytes, file_name=f"{job_id}.mp3", mime="audio/mpeg")
 
         except Exception as e:
-            st.error(f"Failed to submit request: {e}")
+            st.error(f"Failed to process video: {str(e)}")
+            st.error(traceback.format_exc())
+        finally:
+            if tmpdir and os.path.isdir(tmpdir):
+                shutil.rmtree(tmpdir, ignore_errors=True)
