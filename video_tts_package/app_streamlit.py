@@ -1,13 +1,18 @@
 import streamlit as st
-import requests
-import time
 import os
+import tempfile
+import uuid
+import shutil
+import traceback
+from transcript import fetch_transcript_segments
+from tts import synthesize_and_align, ensure_audio_length
 
 st.set_page_config(page_title="YouTube TTS", page_icon="🎙️")
 
 st.title("YouTube Transcript → Hindi TTS")
 
-API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
+OUTPUT_DIR = os.getenv("OUTPUT_DIR", "./outputs")
+os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 video_url = st.text_input("YouTube Video URL", placeholder="https://www.youtube.com/watch?v=dQw4w9WgXcQ")
 
@@ -15,42 +20,52 @@ if st.button("Process Video"):
     if not video_url:
         st.error("Please enter a valid YouTube URL.")
     else:
-        # submit job
-        try:
-            resp = requests.post(f"{API_BASE_URL}/process/", data={"video_url": video_url})
-            resp.raise_for_status()
-            data = resp.json()
-            job_id = data.get("job_id")
+        with st.status("Processing Video...", expanded=True) as status:
+            job_id = uuid.uuid4().hex[:16]
+            st.write(f"Job ID: {job_id}")
 
-            st.success(f"Job started! ID: {job_id}")
+            tmpdir = None
+            try:
+                st.write("Fetching transcript...")
+                segments = fetch_transcript_segments(video_url)
+                st.write(f"Transcript fetched! Found {len(segments)} segments.")
 
-            status_placeholder = st.empty()
+                tmpdir = tempfile.mkdtemp(prefix="vt_")
+                st.write("Translating and synthesizing audio (this may take a while)...")
 
-            while True:
-                status_resp = requests.get(f"{API_BASE_URL}/status/{job_id}")
-                if status_resp.status_code == 200:
-                    status_data = status_resp.json()
-                    status = status_data.get("status")
-                    message = status_data.get("message")
+                final_mp3 = synthesize_and_align(segments, tmpdir, job_id)
 
-                    status_placeholder.info(f"Status: {status} | Message: {message}")
+                st.write("Ensuring proper audio length...")
+                last_seg = segments[-1]
+                expected = last_seg['start'] + last_seg['duration']
+                actual_sec = ensure_audio_length(final_mp3, expected)
 
-                    if status == "done":
-                        st.success("Audio processing complete!")
-                        st.markdown(f"[Download MP3 here]({API_BASE_URL}/output/{job_id})")
+                out_name = f"{job_id}.mp3"
+                out_path = os.path.join(OUTPUT_DIR, out_name)
+                shutil.move(final_mp3, out_path)
 
-                        # also provide a direct audio player
-                        output_resp = requests.get(f"{API_BASE_URL}/output/{job_id}")
-                        if output_resp.status_code == 200:
-                            st.audio(output_resp.content, format="audio/mpeg")
-                        break
-                    elif status == "error":
-                        st.error(f"Error: {status_data.get('error')}")
-                        break
-                else:
-                    status_placeholder.warning("Waiting for status...")
+                status.update(label="Audio processing complete!", state="complete", expanded=False)
 
-                time.sleep(2)
+                st.success(f"Processing complete! Length: {actual_sec:.2f}s")
 
-        except Exception as e:
-            st.error(f"Failed to submit request: {e}")
+                # Provide audio player
+                with open(out_path, "rb") as f:
+                    audio_bytes = f.read()
+
+                st.audio(audio_bytes, format="audio/mpeg")
+
+                # Provide download button
+                st.download_button(
+                    label="Download MP3",
+                    data=audio_bytes,
+                    file_name=out_name,
+                    mime="audio/mpeg"
+                )
+
+            except Exception as e:
+                status.update(label="Processing failed", state="error", expanded=True)
+                st.error(f"Error: {e}")
+                st.code(traceback.format_exc())
+            finally:
+                if tmpdir and os.path.isdir(tmpdir):
+                    shutil.rmtree(tmpdir)

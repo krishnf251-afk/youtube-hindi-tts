@@ -39,7 +39,7 @@ async def synthesize_text_to_file_async(text: str, out_path: str, voice: str = V
     comm = Communicate(text, voice)
     await comm.save(out_path)
 
-def synthesize_and_align(chunks: List[Dict], tmpdir: str, job_id: str, JOBS: dict) -> str:
+def synthesize_and_align(chunks: List[Dict], tmpdir: str, job_id: str, JOBS: Optional[dict] = None) -> str:
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
@@ -60,7 +60,8 @@ def synthesize_and_align(chunks: List[Dict], tmpdir: str, job_id: str, JOBS: dic
                 parts.append({'path': part_path, 'start': start, 'duration': duration})
             else:
                 parts.append({'path': None, 'start': start, 'duration': duration})
-            JOBS[job_id]['message'] = f"synthesized_segment_{i}"
+            if JOBS is not None:
+                JOBS[job_id]['message'] = f"synthesized_segment_{i}"
     except Exception as e:
         raise
 
