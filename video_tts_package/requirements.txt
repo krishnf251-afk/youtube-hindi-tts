@@ -7,3 +7,4 @@ pyaudioop
 requests
 python-dotenv
 streamlit
+pyaudioop
