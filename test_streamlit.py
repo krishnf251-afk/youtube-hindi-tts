@@ -48,7 +48,9 @@ if st.button("🚀 Process Video", type="primary"):
             # Step 1: Fetching video details with yt-dlp
             status_box.update(label="YouTube से वीडियो की जानकारी निकाली जा रही है...", state="running")
             
-            ydl_opts = {'quiet': True}
+            # यहाँ हमने SSL बाईपास वाला नया ऑप्शन जोड़ दिया है: 'nocheckcertificate': True
+            ydl_opts = {'quiet': True, 'nocheckcertificate': True}
+            
             if cookie_file_path:
                 ydl_opts['cookiefile'] = cookie_file_path
 
@@ -77,3 +79,4 @@ if st.button("🚀 Process Video", type="primary"):
         finally:
             if cookie_file_path and os.path.exists(cookie_file_path):
                 os.remove(cookie_file_path)
+                
