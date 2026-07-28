@@ -1,7 +1,8 @@
 import re
 from typing import List, Dict, Optional
 import yt_dlp
-import requests
+from yt_dlp.networking.impersonate import ImpersonateTarget
+from curl_cffi import requests
 
 def extract_video_id(url_or_id: str) -> str:
     if re.match(r'^[A-Za-z0-9_-]{11}$', url_or_id):
@@ -22,7 +23,9 @@ def fetch_transcript_segments(video_url_or_id: str, languages: Optional[List[str
         'writeautomaticsub': True,
         'subtitleslangs': languages,
         'subtitlesformat': 'json3',
-        'quiet': True
+        'quiet': True,
+        'geo_bypass': True,
+        'impersonate': ImpersonateTarget(client='chrome')
     }
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -50,7 +53,7 @@ def fetch_transcript_segments(video_url_or_id: str, languages: Optional[List[str
 
         url = subs[chosen_lang]['url']
         try:
-            r = requests.get(url, timeout=10)
+            r = requests.get(url, timeout=10, impersonate='chrome')
             r.raise_for_status()
             data = r.json()
         except Exception as e:
