@@ -5,5 +5,6 @@ edge-tts
 pydub
 pyaudioop
 requests
+curl-cffi
 python-dotenv
 streamlit
