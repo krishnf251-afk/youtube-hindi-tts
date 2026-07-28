@@ -26,3 +26,4 @@ mutagen
 openai-whisper
 torch
 google-generativeai
+curl_cffi
