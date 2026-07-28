@@ -48,13 +48,15 @@ if st.button("🚀 Process Video", type="primary"):
             # Step 1: Fetching video details with yt-dlp
             status_box.update(label="YouTube से वीडियो की जानकारी निकाली जा रही है...", state="running")
             
-            # ⚠️ NEW ANTI-BLOCK SETTINGS ⚠️
+            # ⚠️ ULTIMATE ANTI-BLOCK & AUTO-CLEAN SETTINGS ⚠️
             ydl_opts = {
                 'quiet': True, 
                 'nocheckcertificate': True,
-                'force_ipv4': True,      # YouTube IP ब्लॉक से बचने के लिए
-                'extractor_retries': 3,  # 3 बार दोबारा कोशिश करेगा
-                'socket_timeout': 30     # थोड़ा ज्यादा समय लेगा
+                'force_ipv4': True,      
+                'extractor_retries': 3,  
+                'socket_timeout': 30,    
+                'impersonate': 'chrome', # 🚨 असली ब्राउज़र का मुखौटा
+                'cachedir': False        # 🧹 कचरा (Cache) जमा नहीं होने देगा
             }
             
             if cookie_file_path:
@@ -83,5 +85,6 @@ if st.button("🚀 Process Video", type="primary"):
             st.error(f"कुछ गड़बड़ हुई: {str(e)}")
             
         finally:
+            # यह हिस्सा टेस्ट के तुरंत बाद टेम्परेरी कुकी फाइल को भी डिलीट कर देता है
             if cookie_file_path and os.path.exists(cookie_file_path):
                 os.remove(cookie_file_path)
