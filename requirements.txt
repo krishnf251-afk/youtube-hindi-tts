@@ -25,3 +25,4 @@ selenium
 mutagen
 openai-whisper
 torch
+google-generativeai
