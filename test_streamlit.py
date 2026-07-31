@@ -47,14 +47,13 @@ if st.button("🚀 Process Video", type="primary"):
         try:
             status_box.update(label="YouTube से वीडियो की जानकारी निकाली जा रही है...", state="running")
             
-            # ⚠️ LATEST ANTI-BLOCK SETTINGS ⚠️
+            # ⚠️ LATEST ANTI-BLOCK SETTINGS (Impersonate हटा दिया गया है) ⚠️
             ydl_opts = {
                 'quiet': True, 
                 'nocheckcertificate': True,
                 'force_ipv4': True,      
                 'extractor_retries': 3,  
                 'socket_timeout': 30,    
-                'impersonate': 'chrome', # यह curl-cffi का इस्तेमाल करेगा
                 'cachedir': False
             }
             
@@ -83,7 +82,6 @@ if st.button("🚀 Process Video", type="primary"):
         except Exception as e:
             status_box.update(label="एरर आया!", state="error")
             st.error("❌ प्रोसेस फेल हो गया। नीचे दी गई जानकारी देखें:")
-            # यह कमांड छुपे हुए एरर को बाहर निकाल कर बॉक्स में छाप देगा
             st.code(traceback.format_exc(), language="python")
             
         finally:
