@@ -10,12 +10,17 @@ st.title("🎙️ AnimeTube Hindi TTS Dashboard")
 
 # Sidebar for Configuration
 st.sidebar.header("⚙️ App Settings")
-gemini_key = st.sidebar.text_input("Gemini API Key", type="password")
-cookies_text = st.sidebar.text_area("YouTube Cookies (TXT Format)")
+st.sidebar.info("💡 API Key और Cookies अब Hugging Face Secrets से अपने आप ले लिए जाएंगे।")
+gemini_key = st.sidebar.text_input("Gemini API Key (Optional)", type="password")
+cookies_text = st.sidebar.text_area("YouTube Cookies (Optional)")
 
-# Environment variable fallback for Secrets
+# 🚨 HUGGING FACE SECRETS SE AUTOMATIC FETCHING 🚨
+# अगर बॉक्स खाली हैं, तो यह सीधे Settings (Secrets) से डेटा खींच लेगा
 if not gemini_key and "GEMINI_API_KEY" in os.environ:
     gemini_key = os.environ["GEMINI_API_KEY"]
+
+if not cookies_text and "YOUTUBE_COOKIES" in os.environ:
+    cookies_text = os.environ["YOUTUBE_COOKIES"]
 
 # Main UI
 st.subheader("1. YouTube वीडियो लिंक डालें")
@@ -35,7 +40,7 @@ if st.button("🚀 Process Video", type="primary"):
         
         # Temp file for cookies if provided
         cookie_file_path = None
-        if cookies_text.strip():
+        if cookies_text and cookies_text.strip():
             with tempfile.NamedTemporaryFile(delete=False, mode="w", suffix=".txt") as tf:
                 tf.write(cookies_text)
                 cookie_file_path = tf.name
@@ -44,7 +49,6 @@ if st.button("🚀 Process Video", type="primary"):
             # Step 1: Fetching video details with yt-dlp
             status_box.update(label="YouTube से वीडियो की जानकारी निकाली जा रही है...", state="running")
             
-            # ⚠️ ULTIMATE ANTI-BLOCK & AUTO-CLEAN SETTINGS ⚠️
             ydl_opts = {
                 'quiet': True, 
                 'nocheckcertificate': True,
@@ -84,4 +88,3 @@ if st.button("🚀 Process Video", type="primary"):
             # यह हिस्सा टेस्ट के तुरंत बाद टेम्परेरी कुकी फाइल को भी डिलीट कर देता है
             if cookie_file_path and os.path.exists(cookie_file_path):
                 os.remove(cookie_file_path)
-    
