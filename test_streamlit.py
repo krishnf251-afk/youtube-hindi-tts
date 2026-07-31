@@ -1,5 +1,6 @@
 import os
 import tempfile
+import traceback
 import streamlit as st
 import yt_dlp
 import google.generativeai as genai
@@ -15,7 +16,6 @@ gemini_key = st.sidebar.text_input("Gemini API Key (Optional)", type="password")
 cookies_text = st.sidebar.text_area("YouTube Cookies (Optional)")
 
 # 🚨 HUGGING FACE SECRETS SE AUTOMATIC FETCHING 🚨
-# अगर बॉक्स खाली हैं, तो यह सीधे Settings (Secrets) से डेटा खींच लेगा
 if not gemini_key and "GEMINI_API_KEY" in os.environ:
     gemini_key = os.environ["GEMINI_API_KEY"]
 
@@ -38,7 +38,6 @@ if st.button("🚀 Process Video", type="primary"):
     else:
         status_box = st.status("प्रोसेसिंग शुरू हो रही है...", expanded=True)
         
-        # Temp file for cookies if provided
         cookie_file_path = None
         if cookies_text and cookies_text.strip():
             with tempfile.NamedTemporaryFile(delete=False, mode="w", suffix=".txt") as tf:
@@ -46,29 +45,30 @@ if st.button("🚀 Process Video", type="primary"):
                 cookie_file_path = tf.name
 
         try:
-            # Step 1: Fetching video details with yt-dlp
             status_box.update(label="YouTube से वीडियो की जानकारी निकाली जा रही है...", state="running")
             
+            # ⚠️ LATEST ANTI-BLOCK SETTINGS ⚠️
             ydl_opts = {
                 'quiet': True, 
                 'nocheckcertificate': True,
                 'force_ipv4': True,      
                 'extractor_retries': 3,  
                 'socket_timeout': 30,    
-                'impersonate': 'chrome', # 🚨 असली ब्राउज़र का मुखौटा
-                'cachedir': False        # 🧹 कचरा (Cache) जमा नहीं होने देगा
+                'impersonate': 'chrome', # यह curl-cffi का इस्तेमाल करेगा
+                'cachedir': False
             }
             
             if cookie_file_path:
                 ydl_opts['cookiefile'] = cookie_file_path
 
+            # Fetch Video Info
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(youtube_url, download=False)
                 video_title = info.get('title', 'YouTube Video')
                 
-            st.success(f"वीडियो मिल गया: **{video_title}**")
+            st.success(f"✅ वीडियो मिल गया: **{video_title}**")
             
-            # Step 2: Gemini API Integration Test
+            # Test Gemini Connection
             if gemini_key:
                 status_box.update(label="Gemini AI मॉडल से कनेक्ट किया जा रहा है...", state="running")
                 genai.configure(api_key=gemini_key)
@@ -76,15 +76,16 @@ if st.button("🚀 Process Video", type="primary"):
                 response = model.generate_content("Say 'Gemini AI connection successful!' in Hindi.")
                 st.info(f"🤖 Gemini AI का रिस्पॉन्स: {response.text}")
             else:
-                st.warning("Gemini API Key नहीं मिली, AI ट्रांसलेशन स्किप किया गया।")
+                st.warning("⚠️ Gemini API Key नहीं मिली, AI ट्रांसलेशन स्किप किया गया।")
 
             status_box.update(label="प्रोसेसिंग पूर्ण हुई!", state="complete")
 
         except Exception as e:
             status_box.update(label="एरर आया!", state="error")
-            st.error(f"कुछ गड़बड़ हुई: {str(e)}")
+            st.error("❌ प्रोसेस फेल हो गया। नीचे दी गई जानकारी देखें:")
+            # यह कमांड छुपे हुए एरर को बाहर निकाल कर बॉक्स में छाप देगा
+            st.code(traceback.format_exc(), language="python")
             
         finally:
-            # यह हिस्सा टेस्ट के तुरंत बाद टेम्परेरी कुकी फाइल को भी डिलीट कर देता है
             if cookie_file_path and os.path.exists(cookie_file_path):
                 os.remove(cookie_file_path)
