@@ -4,10 +4,6 @@ import streamlit as st
 import yt_dlp
 import google.generativeai as genai
 
-# 1. Playwright Setup
-os.system("playwright install chromium")
-os.system("playwright install-deps")
-
 st.set_page_config(page_title="AnimeTube Hindi TTS", page_icon="🎙️", layout="wide")
 
 st.title("🎙️ AnimeTube Hindi TTS Dashboard")
@@ -88,3 +84,4 @@ if st.button("🚀 Process Video", type="primary"):
             # यह हिस्सा टेस्ट के तुरंत बाद टेम्परेरी कुकी फाइल को भी डिलीट कर देता है
             if cookie_file_path and os.path.exists(cookie_file_path):
                 os.remove(cookie_file_path)
+    
