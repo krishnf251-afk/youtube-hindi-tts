@@ -2,6 +2,7 @@ import os
 import tempfile
 import streamlit as st
 import yt_dlp
+from yt_dlp.networking.impersonate import ImpersonateTarget
 import google.generativeai as genai
 
 # 1. Playwright Setup
@@ -21,6 +22,8 @@ cookies_text = st.sidebar.text_area("YouTube Cookies (TXT Format)")
 if not gemini_key and "GEMINI_API_KEY" in os.environ:
     gemini_key = os.environ["GEMINI_API_KEY"]
 
+cookies_env = os.environ.get("YOUTUBE_COOKIES", "")
+
 # Main UI
 st.subheader("1. YouTube वीडियो लिंक डालें")
 youtube_url = st.text_input("YouTube Video URL", placeholder="https://www.youtube.com/watch?v=...")
@@ -39,9 +42,10 @@ if st.button("🚀 Process Video", type="primary"):
         
         # Temp file for cookies if provided
         cookie_file_path = None
-        if cookies_text.strip():
+        active_cookies = cookies_text.strip() or cookies_env.strip()
+        if active_cookies:
             with tempfile.NamedTemporaryFile(delete=False, mode="w", suffix=".txt") as tf:
-                tf.write(cookies_text)
+                tf.write(active_cookies)
                 cookie_file_path = tf.name
 
         try:
@@ -55,7 +59,8 @@ if st.button("🚀 Process Video", type="primary"):
                 'force_ipv4': True,      
                 'extractor_retries': 3,  
                 'socket_timeout': 30,    
-                'impersonate': 'chrome', # 🚨 असली ब्राउज़र का मुखौटा
+                'impersonate': ImpersonateTarget(client='chrome'), # 🚨 असली ब्राउज़र का मुखौटा
+                'geo_bypass': True,
                 'cachedir': False        # 🧹 कचरा (Cache) जमा नहीं होने देगा
             }
             
