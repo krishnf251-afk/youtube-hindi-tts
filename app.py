@@ -11,10 +11,11 @@ import google.generativeai as genai
 import edge_tts
 
 # ==========================================
-# 🛠️ HELPER FUNCTIONS (Crash Fixed)
+# 🛠️ HELPER FUNCTIONS
 # ==========================================
 
 def extract_text_from_vtt(vtt_file):
+    """VTT सबटाइटल फ़ाइल से केवल टेक्स्ट निकालता है"""
     extracted_text = []
     with open(vtt_file, 'r', encoding='utf-8') as f:
         lines = f.readlines()
@@ -26,11 +27,12 @@ def extract_text_from_vtt(vtt_file):
     return " ".join(extracted_text)
 
 async def generate_tts(text, voice, output_path):
+    """Edge TTS का उपयोग करके AI आवाज़ बनाता है"""
     communicate = edge_tts.Communicate(text, voice)
     await communicate.save(output_path)
 
-# Streamlit के लिए Asyncio को सुरक्षित तरीके से चलाने का फंक्शन
 def run_async_task(coro):
+    """Streamlit में Asyncio क्रैश को रोकने का फिक्स"""
     try:
         loop = asyncio.get_event_loop()
     except RuntimeError:
@@ -39,6 +41,7 @@ def run_async_task(coro):
     return loop.run_until_complete(coro)
 
 def apply_audio_ducking(video_input, dubbed_audio_path, output_path, is_stream=False):
+    """FFmpeg का उपयोग करके डकिंग करता है (ओरिजिनल 30%, नई आवाज़ 150%)"""
     ffmpeg_cmd = [
         'ffmpeg', '-y',
         '-i', video_input,
@@ -68,7 +71,7 @@ def apply_audio_ducking(video_input, dubbed_audio_path, output_path, is_stream=F
     subprocess.run(ffmpeg_cmd, check=True)
 
 # ==========================================
-# 🖥️ MAIN UI & APP ENGINE
+# 🖥️ MAIN UI & APP ENGINE (Personal Use)
 # ==========================================
 
 st.set_page_config(page_title="Vayu Anime Dub Studio", page_icon="🌪️", layout="wide")
@@ -76,10 +79,12 @@ st.set_page_config(page_title="Vayu Anime Dub Studio", page_icon="🌪️", layo
 st.title("🌪️ Vayu Anime Dub Studio")
 st.write("पर्सनल डबिंग इंजन: लिंक डालें और AI ऑटोमैटिक ट्रांसलेट करके डब कर देगा।")
 
+# Sidebar Configuration
 st.sidebar.header("⚙️ Settings")
 gemini_key = st.sidebar.text_input("Gemini API Key", type="password", value=os.environ.get("GEMINI_API_KEY", ""))
 cookies_text = st.sidebar.text_area("YouTube Cookies (Optional)", value=os.environ.get("YOUTUBE_COOKIES", ""))
 
+# Main Inputs
 youtube_url = st.text_input("YouTube Video URL", placeholder="https://www.youtube.com/watch?v=...")
 
 col1, col2, col3 = st.columns(3)
@@ -110,6 +115,7 @@ if st.button("🚀 Start Auto-Dubbing", type="primary"):
                 cookie_file = tf.name
 
         try:
+            # STEP 1: Extract Subtitles (With Geo-Bypass applied)
             status.update(label="1/4: YouTube से सबटाइटल निकाले जा रहे हैं...", state="running")
             subtitle_path_base = os.path.join(temp_dir, "subs")
             
@@ -122,7 +128,9 @@ if st.button("🚀 Start Auto-Dubbing", type="primary"):
                 'quiet': True,
                 'nocheckcertificate': True,
                 'force_ipv4': True,
-                'impersonate': ImpersonateTarget(client='chrome')
+                'impersonate': ImpersonateTarget(client='chrome'),
+                'geo_bypass': True,           # 🚨 Geo-Block Fix 
+                'geo_bypass_country': 'IN'    # 🚨 India Location
             }
             if cookie_file: ydl_opts_subs['cookiefile'] = cookie_file
 
@@ -138,10 +146,11 @@ if st.button("🚀 Start Auto-Dubbing", type="primary"):
             
             extracted_text = extract_text_from_vtt(os.path.join(temp_dir, sub_files[0]))
             
+            # STEP 2: Gemini AI Translation (Using Latest Models)
             status.update(label=f"2/4: {ai_model_choice} ट्रांसलेट कर रहा है...", state="running")
             genai.configure(api_key=gemini_key)
             
-            selected_model = 'gemini-3.1-pro' if "3.1 Pro" in ai_model_choice else 'gemini-1.5-flash'
+            selected_model = 'gemini-3.1-pro' if "3.1 Pro" in ai_model_choice else 'gemini-3.5-flash'
             model = genai.GenerativeModel(selected_model)
             
             prompt = f"Translate the following YouTube video transcript to natural sounding Hindi for a voiceover. Only return the Hindi translation, nothing else:\n\n{extracted_text[:5000]}"
@@ -151,12 +160,12 @@ if st.button("🚀 Start Auto-Dubbing", type="primary"):
             with st.expander("AI द्वारा जनरेट की गई स्क्रिप्ट देखें"):
                 st.write(hindi_script)
 
+            # STEP 3: Generate Voice
             status.update(label="3/4: स्क्रिप्ट से AI आवाज़ बनाई जा रही है...", state="running")
             tts_audio_path = os.path.join(temp_dir, "tts_audio.wav")
-            
-            # 🚨 यहाँ Asyncio क्रैश को फिक्स किया गया है 🚨
-            run_async_task(generate_tts(hindi_script, actual_voice_id, tts_audio_path))
+            run_async_task(generate_tts(hindi_script, actual_voice_id, tts_audio_path)) # 🚨 Asyncio Fix
 
+            # STEP 4: Audio Ducking & Final Render
             final_output_path = os.path.join(temp_dir, f"Dubbed_Vayu_Personal.mp4")
             
             if "स्ट्रीम" in process_mode:
@@ -169,7 +178,9 @@ if st.button("🚀 Start Auto-Dubbing", type="primary"):
                     'format': 'best',
                     'outtmpl': original_vid_path,
                     'quiet': True,
-                    'impersonate': ImpersonateTarget(client='chrome')
+                    'impersonate': ImpersonateTarget(client='chrome'),
+                    'geo_bypass': True,           # 🚨 Geo-Block Fix
+                    'geo_bypass_country': 'IN'    # 🚨 India Location
                 }
                 with yt_dlp.YoutubeDL(ydl_opts_vid) as ydl:
                     ydl.download([youtube_url])
@@ -179,6 +190,7 @@ if st.button("🚀 Start Auto-Dubbing", type="primary"):
             status.update(label="🎉 वीडियो डबिंग पूरी हुई!", state="complete")
             st.success("✅ आपका Vayu AI डब वीडियो तैयार है!")
 
+            # Download Button
             with open(final_output_path, "rb") as file:
                 st.download_button(
                     label="⬇️ डब किया हुआ वीडियो डाउनलोड करें",
@@ -190,10 +202,10 @@ if st.button("🚀 Start Auto-Dubbing", type="primary"):
 
         except Exception as e:
             status.update(label="❌ एरर आया!", state="error")
-            st.error("प्रोसेस फेल हो गया। कृपया Logs चेक करें।")
+            st.error("प्रोसेस फेल हो गया।")
             st.code(traceback.format_exc(), language="python")
             
         finally:
             if cookie_file and os.path.exists(cookie_file):
                 os.remove(cookie_file)
-              
+            
