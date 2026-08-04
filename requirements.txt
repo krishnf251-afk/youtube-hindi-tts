@@ -1,4 +1,5 @@
 streamlit
 yt-dlp
 google-generativeai
-curl-cffi
+edge-tts
+
